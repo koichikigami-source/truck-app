@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="積み込みリスト">
+<meta name="theme-color" content="#1a6b3a">
+<title>積み込みリスト</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f4f0;--w:#fff;--g1:#f0efe9;--g2:#e0ddd4;--g3:#9b9890;--tx:#1a1916;--tx2:#6b6860;--gn:#1a6b3a;--gn2:#e0f0e7;--rd:#c0392b;--og:#e67e22;--og2:#fef3e8;--bl:#2980b9;--bl2:#e8f4fb;--pu:#8e44ad;--pu2:#f5eefb;--r:12px;--rs:8px;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+#hdr{background:var(--w);border-bottom:1px solid var(--g2);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:100;}
+#hdr-title{font-size:17px;font-weight:700;}
+#settings-btn{width:38px;height:38px;border-radius:50%;border:none;background:var(--g1);cursor:pointer;font-size:16px;}
+#truck-tabs{background:var(--w);border-bottom:2px solid var(--g2);display:flex;position:sticky;top:56px;z-index:99;}
+.truck-tab{flex:1;padding:12px;font-size:14px;font-weight:700;color:var(--tx2);text-align:center;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;}
+.truck-tab.on{color:var(--gn);border-bottom-color:var(--gn);}
+#cat-tabs{background:var(--w);border-bottom:1px solid var(--g2);display:flex;overflow-x:auto;scrollbar-width:none;position:sticky;top:103px;z-index:98;padding:0 12px;}
+#cat-tabs::-webkit-scrollbar{display:none;}
+.cat-tab{padding:9px 14px;font-size:13px;font-weight:500;color:var(--tx2);border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer;flex-shrink:0;display:flex;align-items:center;gap:5px;}
+.cat-tab.on{color:var(--gn);border-bottom-color:var(--gn);}
+.cat-tab-n{font-size:11px;padding:1px 6px;border-radius:10px;background:#e74c3c;color:#fff;}
+#main{padding:12px 16px 120px;max-width:600px;margin:0 auto;}
+#add-box{background:var(--w);border-radius:var(--r);border:1px solid var(--g2);margin-bottom:12px;overflow:hidden;}
+#add-row{display:flex;align-items:center;gap:8px;padding:10px 12px;}
+#add-input{flex:1;border:none;background:transparent;font-size:15px;font-family:inherit;color:var(--tx);outline:none;}
+#add-input::placeholder{color:var(--g3);}
+#mic-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--g1);cursor:pointer;font-size:15px;flex-shrink:0;}
+#mic-btn.rec{background:#fee;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+#do-add{padding:8px 18px;background:var(--gn);color:#fff;border:none;border-radius:var(--rs);font-size:14px;font-weight:500;cursor:pointer;flex-shrink:0;font-family:inherit;}
+#staples-toggle{padding:9px 12px;background:var(--g1);border-top:1px solid var(--g2);font-size:12px;color:var(--tx2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+#staples-panel{border-top:1px solid var(--g2);padding:10px 12px;display:none;}
+#staples-panel.open{display:block;}
+#staple-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.s-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--g2);font-size:13px;cursor:pointer;background:var(--w);transition:all .2s;}
+.s-chip.added{background:var(--gn2);border-color:var(--gn);color:var(--gn);transform:scale(1.05);}
+#clear-btn-wrap{display:flex;justify-content:flex-end;margin-bottom:8px;}
+#clear-btn{padding:7px 14px;border-radius:20px;border:1px solid var(--rd);background:transparent;color:var(--rd);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;}
+/* items */
+.iw{position:relative;overflow:hidden;border-top:1px solid var(--g2);}
+.del-bg{position:absolute;right:0;top:0;bottom:0;width:88px;background:var(--rd);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+.si{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--w);transition:transform .2s;position:relative;touch-action:pan-y;user-select:none;}
+.si.faded{opacity:.4;}
+.chk{width:28px;height:28px;border-radius:50%;border:2px solid var(--g2);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s;}
+.chk.done{background:var(--gn);border-color:var(--gn);color:#fff;}
+.iname{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.iname.done{text-decoration:line-through;color:var(--g3);}
+.urgent-badge{background:#e74c3c;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0;}
+.qty-c{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.qbtn{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--g2);background:var(--g1);color:var(--tx);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;}
+.qbtn:active{background:var(--g2);}
+.qnum{font-size:14px;min-width:26px;text-align:center;cursor:pointer;padding:3px 0;border-bottom:1px dashed var(--g2);}
+/* urgent toggle */
+.urg-btn{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--g2);background:var(--w);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s;}
+.urg-btn.on{background:#e74c3c;border-color:#e74c3c;color:#fff;}
+/* section */
+.a-sec{margin-bottom:8px;border-radius:var(--r);overflow:hidden;border:1px solid var(--g2);background:var(--w);}
+.a-hdr{padding:11px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;}
+.a-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.a-lbl{font-size:13px;font-weight:600;flex:1;}
+.a-cnt{font-size:12px;color:var(--g3);}
+.a-chev{font-size:11px;color:var(--g3);transition:transform .2s;}
+.a-sec.col .a-chev{transform:rotate(-90deg);}
+.a-sec.col .a-body{display:none;}
+.a-prog{height:3px;background:var(--g2);}
+.a-prog-fill{height:100%;transition:width .3s;}
+.empty{text-align:center;padding:48px 24px;color:var(--g3);}
+/* undo */
+#undo-bar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 18px;border-radius:var(--r);font-size:13px;display:flex;align-items:center;gap:16px;opacity:0;pointer-events:none;transition:opacity .3s;z-index:500;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+#undo-bar.show{opacity:1;pointer-events:all;}
+#undo-btn{color:#7dd87d;font-weight:700;cursor:pointer;border:none;background:transparent;font-size:13px;}
+/* settings */
+#settings{display:none;padding:12px 16px 80px;max-width:600px;margin:0 auto;}
+#settings.show{display:block;}
+#main-wrap.hide{display:none;}
+#truck-tabs-wrap.hide{display:none;}
+#cat-tabs.hide{display:none;}
+.set-card{background:var(--w);border-radius:var(--r);border:1px solid var(--g2);margin-bottom:12px;overflow:hidden;}
+.set-grp{border-top:1px solid var(--g2);padding:10px 14px;font-size:13px;font-weight:600;background:var(--g1);display:flex;align-items:center;gap:8px;}
+.set-grp:first-child{border-top:none;}
+.set-row{display:flex;align-items:center;gap:8px;padding:13px 14px;border-top:1px solid var(--g2);}
+.set-row.dragging{opacity:.4;background:var(--g1);}
+.set-row.drag-over{border-top:2px solid var(--gn);}
+.set-name{flex:1;font-size:14px;}
+.set-meta{font-size:12px;color:var(--g3);}
+.set-add{padding:13px 14px;display:flex;align-items:center;gap:6px;border-top:1px solid var(--g2);cursor:pointer;color:var(--gn);font-size:13px;font-weight:500;}
+.ebtn{border:none;background:transparent;cursor:pointer;font-size:14px;padding:4px 6px;color:var(--tx2);}
+.dbtn{border:none;background:transparent;cursor:pointer;font-size:15px;padding:4px 8px;color:var(--rd);font-weight:700;}
+.drag-handle{cursor:grab;padding:4px 8px;color:var(--g3);font-size:18px;flex-shrink:0;}
+.back{font-size:13px;color:var(--gn);cursor:pointer;}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+.ov.open{opacity:1;pointer-events:all;}
+.modal{background:var(--w);border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:20px 20px 44px;transform:translateY(16px);transition:transform .2s;}
+.ov.open .modal{transform:translateY(0);}
+.m-title{font-size:16px;font-weight:700;margin-bottom:16px;}
+.m-label{font-size:12px;color:var(--tx2);margin-bottom:5px;}
+.m-field{margin-bottom:12px;}
+.m-inp{width:100%;border:1px solid var(--g2);border-radius:var(--rs);padding:10px 12px;font-size:15px;font-family:inherit;outline:none;background:var(--g1);}
+.m-inp:focus{border-color:var(--gn);}
+.cp{display:flex;gap:8px;flex-wrap:wrap;}
+.csw{width:30px;height:30px;border-radius:50%;cursor:pointer;border:3px solid transparent;}
+.csw.on{border-color:#333;}
+.m-acts{display:flex;gap:8px;margin-top:16px;}
+.mbtn{flex:1;padding:12px;border-radius:var(--rs);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--g2);background:var(--g1);color:var(--tx);}
+.mbtn-p{background:var(--gn);color:#fff;border-color:var(--gn);}
+#qty-ov{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:250;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s;}
+#qty-ov.open{opacity:1;pointer-events:all;}
+#qty-box{background:var(--w);border-radius:var(--r);padding:24px 20px;width:200px;text-align:center;}
+#qty-item-name{font-size:13px;color:var(--tx2);margin-bottom:12px;}
+#qty-inp{width:100%;border:1px solid var(--g2);border-radius:var(--rs);padding:10px;font-size:24px;text-align:center;outline:none;font-family:inherit;}
+#qty-inp:focus{border-color:var(--gn);}
+#qty-ok{margin-top:12px;width:100%;padding:10px;background:var(--gn);color:#fff;border:none;border-radius:var(--rs);font-size:14px;cursor:pointer;font-family:inherit;font-weight:500;}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <div id="hdr-left"><span id="hdr-title">🚚 積み込みリスト</span></div>
+  <button id="settings-btn">⚙️</button>
+</div>
+<div id="main-wrap">
+  <div id="truck-tabs-wrap">
+    <div id="truck-tabs"></div>
+  </div>
+  <div id="cat-tabs"></div>
+  <div id="main"></div>
+</div>
+<div id="settings">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-top:4px;">
+    <span class="back" id="back-btn">← 戻る</span>
+    <span style="font-size:16px;font-weight:700;">設定</span>
+  </div>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:6px;">カテゴリ管理</div>
+  <div class="set-card" id="cat-settings"></div>
+  <div style="font-size:12px;color:var(--tx2);margin:16px 0 6px;">定番リスト</div>
+  <div class="set-card" id="staple-settings"></div>
+</div>
+<!-- Category modal -->
+<div class="ov" id="cat-ov">
+  <div class="modal">
+    <div class="m-title" id="cat-m-title">カテゴリを追加</div>
+    <div class="m-field"><div class="m-label">カテゴリ名</div><input class="m-inp" id="cat-name-inp" placeholder="例：ドライ"></div>
+    <div class="m-field"><div class="m-label">種類</div>
+      <select class="m-inp" id="cat-type-inp">
+        <option value="stock">在庫（数量あり）</option>
+        <option value="prep">仕込み（数量なし・急ぎあり）</option>
+      </select>
+    </div>
+    <div class="m-field"><div class="m-label">色</div><div class="cp" id="cp"></div></div>
+    <div class="m-acts">
+      <button class="mbtn" onclick="closeOv('cat-ov')">キャンセル</button>
+      <button class="mbtn mbtn-p" onclick="saveCat()">保存</button>
+    </div>
+  </div>
+</div>
+<!-- Staple modal -->
+<div class="ov" id="staple-ov">
+  <div class="modal">
+    <div class="m-title" id="staple-m-title">定番アイテムを追加</div>
+    <div class="m-field"><div class="m-label">アイテム名</div><input class="m-inp" id="staple-name-inp" placeholder="例：醤油"></div>
+    <div class="m-field"><div class="m-label">カテゴリ</div><select class="m-inp" id="staple-cat-inp"></select></div>
+    <div class="m-acts">
+      <button class="mbtn" onclick="closeOv('staple-ov')">キャンセル</button>
+      <button class="mbtn mbtn-p" onclick="saveStaple()">保存</button>
+    </div>
+  </div>
+</div>
+<!-- Qty modal -->
+<div id="qty-ov">
+  <div id="qty-box">
+    <div id="qty-item-name">数量</div>
+    <input id="qty-inp" type="number" min="1" value="1">
+    <button id="qty-ok" onclick="saveQty()">OK</button>
+  </div>
+</div>
+<div id="undo-bar"><span id="undo-msg">削除しました</span><button id="undo-btn" onclick="doUndo()">元に戻す</button></div>
+
+<script>
+var SB = supabase.createClient(
+  'https://pfobhvsslpxuiglfacss.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmb2JodnNzbHB4dWlnbGZhY3NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyODg4NzIsImV4cCI6MjA5Mjg2NDg3Mn0.yyYgQnDrT2OTgKHsTtNPbNLesMUd_mGYlqZlU6mLZQE'
+);
+var COLORS = ['#e74c3c','#e67e22','#f39c12','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63','#795548','#607d8b'];
+
+var trucks=[], cats=[], staples=[], items=[];
+var activeTruck=null, activeCat=null;
+var editCatId=null, editStapleId=null, qtyItemId=null;
+var staplesOpen=false, isRec=false, recog=null;
+var undoStack=null, undoTimer=null;
+var localOps={};
+
+async function boot() {
+  await reload();
+  SB.channel('truck-app')
+    .on('postgres_changes',{event:'*',schema:'public'},function(p){
+      var tbl=p.table;
+      if(tbl==='truck_items'){
+        if(p.eventType==='INSERT'&&p.new){
+          var ex=false; for(var i=0;i<items.length;i++){if(items[i].id===p.new.id){ex=true;break;}} if(!ex) items.push(p.new);
+        } else if(p.eventType==='UPDATE'&&p.new){
+          var f=false; for(var i=0;i<items.length;i++){if(items[i].id===p.new.id){items[i]=p.new;f=true;break;}} if(!f) items.push(p.new);
+        } else if(p.eventType==='DELETE'&&p.old){
+          items=items.filter(function(i){return i.id!==p.old.id;});
+        }
+        drawAll();
+      } else {
+        reload().then(function(){drawAll();});
+      }
+    })
+    .subscribe(function(s){console.log('RT:',s);});
+  drawAll();
+}
+
+async function reload() {
+  var r = await Promise.all([
+    SB.from('trucks').select('*').order('sort_order'),
+    SB.from('truck_categories').select('*').order('sort_order'),
+    SB.from('truck_staples').select('*').order('sort_order'),
+    SB.from('truck_items').select('*').order('created_at')
+  ]);
+  trucks=r[0].data||[]; cats=r[1].data||[]; staples=r[2].data||[]; items=r[3].data||[];
+  if(!activeTruck&&trucks.length) activeTruck=trucks[0].id;
+  if(!activeCat){
+    var tc=cats.filter(function(c){return c.truck_id===activeTruck;});
+    if(tc.length) activeCat=tc[0].id;
+  }
+}
+
+function drawAll(){drawTruckTabs();drawCatTabs();drawMain();if(document.getElementById('settings').classList.contains('show'))drawSettings();}
+
+function drawTruckTabs(){
+  var el=document.getElementById('truck-tabs');
+  var h='';
+  for(var i=0;i<trucks.length;i++){
+    var t=trucks[i];
+    var n=items.filter(function(it){return it.truck_id===t.id&&!it.checked;}).length;
+    h+='<div class="truck-tab'+(t.id===activeTruck?' on':'')+'" onclick="setTruck(\''+t.id+'\')">';
+    h+=t.name+(n?' <span style="background:#e74c3c;color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;">'+n+'</span>':'');
+    h+='</div>';
+  }
+  el.innerHTML=h;
+}
+
+function drawCatTabs(){
+  var el=document.getElementById('cat-tabs');
+  var tc=cats.filter(function(c){return c.truck_id===activeTruck;});
+  var h='';
+  for(var i=0;i<tc.length;i++){
+    var c=tc[i];
+    var n=items.filter(function(it){return it.category_id===c.id&&!it.checked;}).length;
+    var badge=n?'<span class="cat-tab-n">'+n+'</span>':'';
+    h+='<div class="cat-tab'+(c.id===activeCat?' on':'')+'" onclick="setCat(\''+c.id+'\')">'+c.name+badge+'</div>';
+  }
+  el.innerHTML=h;
+}
+
+function drawMain(){
+  var el=document.getElementById('main');
+  if(!activeTruck||!activeCat){el.innerHTML='<div class="empty">⚙️設定からカテゴリを追加してください</div>';return;}
+  var cat=null; for(var i=0;i<cats.length;i++){if(cats[i].id===activeCat){cat=cats[i];break;}}
+  if(!cat){el.innerHTML='<div class="empty">カテゴリを選択してください</div>';return;}
+  var isPrep=cat.type==='prep';
+  var ci=items.filter(function(it){return it.category_id===activeCat;});
+  var cs=staples.filter(function(s){return s.category_id===activeCat;});
+  var hasChecked=ci.some(function(it){return it.checked;});
+  var h='';
+
+  // Add box
+  h+='<div id="add-box"><div id="add-row">';
+  h+='<input id="add-input" placeholder="アイテムを追加..." onkeydown="if(event.key===\'Enter\')doAdd()">';
+  h+='<button id="mic-btn" class="'+(isRec?'rec':'')+'" onclick="toggleMic()">🎤</button>';
+  h+='<button id="do-add" onclick="doAdd()">追加</button>';
+  h+='</div>';
+  if(cs.length){
+    h+='<div id="staples-toggle" onclick="toggleStaples()"><span>📋 定番リストから追加</span><span>'+(staplesOpen?'▲':'▼')+'</span></div>';
+    h+='<div id="staples-panel"'+(staplesOpen?' class="open"':'')+'>';
+    h+='<div id="staple-chips">';
+    for(var i=0;i<cs.length;i++) h+='<div class="s-chip" id="chip-'+cs[i].id+'" onclick="addFromStaple(\''+cs[i].id+'\')">'+cs[i].name+'</div>';
+    h+='</div></div>';
+  }
+  h+='</div>';
+
+  // Clear button
+  if(hasChecked) h+='<div id="clear-btn-wrap"><button id="clear-btn" onclick="clearChecked()">✓ 完了済みをすべて削除</button></div>';
+
+  // Items
+  if(!ci.length){
+    h+='<div class="empty">リストは空です ✅</div>';
+  } else {
+    // Sort by urgent first, then staple order
+    ci.sort(function(a,b){
+      if(a.urgent&&!b.urgent) return -1;
+      if(!a.urgent&&b.urgent) return 1;
+      var sa=9999,sb=9999;
+      for(var k=0;k<staples.length;k++){
+        if(staples[k].name===a.name&&staples[k].category_id===activeCat) sa=staples[k].sort_order||9999;
+        if(staples[k].name===b.name&&staples[k].category_id===activeCat) sb=staples[k].sort_order||9999;
+      }
+      return sa-sb;
+    });
+    h+='<div class="a-sec"><div class="a-body">';
+    for(var i=0;i<ci.length;i++) h+=itemHTML(ci[i],isPrep);
+    h+='</div></div>';
+  }
+
+  el.innerHTML=h;
+  attachSwipe();
+}
+
+function itemHTML(it,isPrep){
+  var dc=it.checked?' done':'';
+  var fc=it.checked?' faded':'';
+  var id=it.id;
+  var nm=it.name.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  var nmR=it.name.replace(/'/g,'&#39;');
+  var h='<div class="iw" id="iw-'+id+'">';
+  if(!it.checked) h+='<div class="del-bg" onclick="delItem(\''+id+'\')">削除</div>';
+  h+='<div class="si'+fc+'" id="si-'+id+'">';
+  h+='<div class="chk'+(it.checked?' done':'')+'" onclick="togChk(\''+id+'\')">'+(it.checked?'✓':'')+'</div>';
+  if(isPrep&&!it.checked){
+    h+='<div class="urg-btn'+(it.urgent?' on':'')+'" onclick="togUrgent(\''+id+'\')">!</div>';
+  }
+  h+='<div class="iname'+dc+'">'+nm+'</div>';
+  if(isPrep&&it.urgent&&!it.checked) h+='<span class="urgent-badge">急ぎ</span>';
+  if(!isPrep&&!it.checked){
+    h+='<div class="qty-c">';
+    h+='<button class="qbtn" onclick="chgQty(\''+id+'\',-1)">−</button>';
+    h+='<div class="qnum" onclick="openQty(\''+id+'\',\''+nmR+'\','+it.quantity+')">'+it.quantity+'</div>';
+    h+='<button class="qbtn" onclick="chgQty(\''+id+'\',1)">＋</button>';
+    h+='</div>';
+  }
+  h+='</div></div>';
+  return h;
+}
+
+function attachSwipe(){
+  var els=document.querySelectorAll('.si:not(.faded)');
+  for(var i=0;i<els.length;i++){
+    (function(el){
+      var sx=0,sy=0,dx=0,sw=false;
+      el.addEventListener('touchstart',function(e){sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=0;sw=el.classList.contains('sw');},{passive:true});
+      el.addEventListener('touchmove',function(e){
+        dx=e.touches[0].clientX-sx;
+        if(Math.abs(e.touches[0].clientY-sy)>Math.abs(dx))return;
+        var mv=sw?Math.min(0,Math.max(-88,-88+dx)):Math.max(-88,Math.min(0,dx));
+        el.style.transition='none';el.style.transform='translateX('+mv+'px)';
+      },{passive:true});
+      el.addEventListener('touchend',function(){
+        el.style.transition='transform .2s';
+        if(!sw&&dx<-44){el.style.transform='translateX(-88px)';el.classList.add('sw');sw=true;}
+        else if(sw&&dx>44){el.style.transform='translateX(0)';el.classList.remove('sw');sw=false;}
+        else{el.style.transform=sw?'translateX(-88px)':'translateX(0)';}
+      });
+    })(els[i]);
+  }
+}
+
+function setTruck(id){
+  activeTruck=id;
+  var tc=cats.filter(function(c){return c.truck_id===id;});
+  activeCat=tc.length?tc[0].id:null;
+  staplesOpen=false;
+  drawAll();
+}
+function setCat(id){activeCat=id;staplesOpen=false;drawAll();}
+function toggleStaples(){staplesOpen=!staplesOpen;drawMain();}
+
+async function doAdd(){
+  var inp=document.getElementById('add-input');
+  var name=inp.value.trim();
+  if(!name||!activeCat||!activeTruck)return;
+  var cat=null; for(var i=0;i<cats.length;i++){if(cats[i].id===activeCat){cat=cats[i];break;}}
+  var isPrep=cat&&cat.type==='prep';
+  var r=await SB.from('truck_items').insert({truck_id:activeTruck,category_id:activeCat,name:name,quantity:1,checked:false,urgent:false}).select().single();
+  if(r.data) items.push(r.data);
+  if(!isPrep){
+    var already=false;
+    for(var i=0;i<staples.length;i++){if(staples[i].name===name&&staples[i].category_id===activeCat){already=true;break;}}
+    if(!already){
+      var mx=0; for(var i=0;i<staples.length;i++){if(staples[i].category_id===activeCat&&(staples[i].sort_order||0)>mx)mx=staples[i].sort_order||0;}
+      var sr=await SB.from('truck_staples').insert({category_id:activeCat,name:name,sort_order:mx+1}).select().single();
+      if(sr.data) staples.push(sr.data);
+    }
+  }
+  inp.value=''; drawAll();
+}
+
+async function addFromStaple(sid){
+  var s=null; for(var i=0;i<staples.length;i++){if(staples[i].id===sid){s=staples[i];break;}} if(!s)return;
+  var chip=document.getElementById('chip-'+sid);
+  if(chip){chip.classList.add('added');setTimeout(function(){chip.classList.remove('added');},600);}
+  var audioCtx=null;
+  try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();var o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=880;g.gain.setValueAtTime(0.3,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.15);o.start();o.stop(audioCtx.currentTime+0.2);}catch(e){}
+  var ex=null; for(var i=0;i<items.length;i++){if(items[i].category_id===activeCat&&items[i].name===s.name&&!items[i].checked){ex=items[i];break;}}
+  if(ex){
+    await SB.from('truck_items').update({quantity:ex.quantity+1}).eq('id',ex.id);
+    ex.quantity++;
+  } else {
+    var lq=s.last_qty||1;
+    var r=await SB.from('truck_items').insert({truck_id:activeTruck,category_id:activeCat,name:s.name,quantity:lq,checked:false,urgent:false}).select().single();
+    if(r.data) items.push(r.data);
+  }
+  drawAll();
+}
+
+async function togChk(id){
+  var it=null; for(var i=0;i<items.length;i++){if(items[i].id===id){it=items[i];break;}} if(!it)return;
+  var nv=!it.checked;
+  it.checked=nv; drawAll();
+  if(nv&&it.category_id){
+    for(var i=0;i<staples.length;i++){if(staples[i].name===it.name&&staples[i].category_id===it.category_id){staples[i].last_qty=it.quantity;SB.from('truck_staples').update({last_qty:it.quantity}).eq('id',staples[i].id);break;}}
+  }
+  await SB.from('truck_items').update({checked:nv}).eq('id',id);
+}
+
+async function togUrgent(id){
+  var it=null; for(var i=0;i<items.length;i++){if(items[i].id===id){it=items[i];break;}} if(!it)return;
+  it.urgent=!it.urgent; drawAll();
+  await SB.from('truck_items').update({urgent:it.urgent}).eq('id',id);
+}
+
+async function chgQty(id,d){
+  var it=null; for(var i=0;i<items.length;i++){if(items[i].id===id){it=items[i];break;}} if(!it)return;
+  var nq=Math.max(1,it.quantity+d);
+  it.quantity=nq; drawAll();
+  await SB.from('truck_items').update({quantity:nq}).eq('id',id);
+}
+
+async function delItem(id){
+  var it=null; for(var i=0;i<items.length;i++){if(items[i].id===id){it=items[i];break;}} if(!it)return;
+  undoStack=[{id:it.id,truck_id:it.truck_id,category_id:it.category_id,name:it.name,quantity:it.quantity,checked:it.checked,urgent:it.urgent}];
+  items=items.filter(function(i){return i.id!==id;}); drawAll();
+  showUndo('「'+it.name+'」を削除');
+  await SB.from('truck_items').delete().eq('id',id);
+}
+
+function clearChecked(){
+  var si=items.filter(function(i){return i.category_id===activeCat&&i.checked;});
+  if(!si.length)return;
+  try{var ac=new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.frequency.value=330;g.gain.setValueAtTime(0.25,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.2);o.start();o.stop(ac.currentTime+0.2);}catch(e){}
+  undoStack=si.map(function(it){return{id:it.id,truck_id:it.truck_id,category_id:it.category_id,name:it.name,quantity:it.quantity,checked:it.checked,urgent:it.urgent};});
+  var ids=si.map(function(i){return i.id;});
+  items=items.filter(function(i){return ids.indexOf(i.id)===-1;}); drawAll();
+  showUndo(si.length+'件の完了済みを削除');
+  SB.from('truck_items').delete().in('id',ids);
+}
+
+function showUndo(msg){
+  if(undoTimer)clearTimeout(undoTimer);
+  document.getElementById('undo-msg').textContent=msg;
+  document.getElementById('undo-bar').classList.add('show');
+  undoTimer=setTimeout(function(){document.getElementById('undo-bar').classList.remove('show');undoStack=null;},5000);
+}
+
+async function doUndo(){
+  if(!undoStack||!undoStack.length)return;
+  for(var i=0;i<undoStack.length;i++){
+    var u=undoStack[i];
+    var r=await SB.from('truck_items').insert({truck_id:u.truck_id,category_id:u.category_id,name:u.name,quantity:u.quantity,checked:u.checked,urgent:u.urgent}).select().single();
+    if(r.data) items.push(r.data);
+  }
+  document.getElementById('undo-bar').classList.remove('show');
+  undoStack=null; if(undoTimer)clearTimeout(undoTimer); drawAll();
+}
+
+function openQty(id,name,qty){
+  qtyItemId=id;
+  document.getElementById('qty-item-name').textContent=name;
+  document.getElementById('qty-inp').value=qty;
+  document.getElementById('qty-ov').classList.add('open');
+  setTimeout(function(){document.getElementById('qty-inp').select();},100);
+}
+async function saveQty(){
+  var q=parseInt(document.getElementById('qty-inp').value)||1;
+  if(qtyItemId){
+    var it=null; for(var i=0;i<items.length;i++){if(items[i].id===qtyItemId){it=items[i];break;}}
+    if(it){it.quantity=Math.max(1,q);drawAll();await SB.from('truck_items').update({quantity:Math.max(1,q)}).eq('id',qtyItemId);}
+  }
+  document.getElementById('qty-ov').classList.remove('open');qtyItemId=null;
+}
+document.getElementById('qty-ov').addEventListener('click',function(e){if(e.target===document.getElementById('qty-ov'))document.getElementById('qty-ov').classList.remove('open');});
+document.getElementById('qty-inp').addEventListener('keydown',function(e){if(e.key==='Enter')saveQty();});
+
+function toggleMic(){
+  if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){alert('音声入力非対応');return;}
+  if(isRec){recog.stop();return;}
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recog=new SR();recog.lang='ja-JP';
+  recog.onresult=function(e){var inp=document.getElementById('add-input');if(inp)inp.value=e.results[0][0].transcript;};
+  recog.onend=function(){isRec=false;var b=document.getElementById('mic-btn');if(b)b.className='';};
+  recog.start();isRec=true;var b=document.getElementById('mic-btn');if(b)b.className='rec';
+}
+
+function openOv(id){document.getElementById(id).classList.add('open');}
+function closeOv(id){document.getElementById(id).classList.remove('open');editCatId=null;editStapleId=null;}
+document.querySelectorAll('.ov').forEach(function(el){el.addEventListener('click',function(e){if(e.target===el)el.classList.remove('open');});});
+
+function drawCP(sel){
+  var h='';
+  for(var i=0;i<COLORS.length;i++) h+='<div class="csw'+(COLORS[i]===sel?' on':'')+'" style="background:'+COLORS[i]+'" onclick="pickColor(\''+COLORS[i]+'\')"></div>';
+  document.getElementById('cp').innerHTML=h;
+}
+function pickColor(c){drawCP(c);}
+function getColor(){var el=document.querySelector('.csw.on');return el?el.style.backgroundColor:COLORS[0];}
+
+function openAddCat(){
+  editCatId=null;
+  document.getElementById('cat-m-title').textContent='カテゴリを追加';
+  document.getElementById('cat-name-inp').value='';
+  document.getElementById('cat-type-inp').value='stock';
+  drawCP(COLORS[0]);openOv('cat-ov');
+}
+function openEditCat(id){
+  var c=null; for(var i=0;i<cats.length;i++){if(cats[i].id===id){c=cats[i];break;}} if(!c)return;
+  editCatId=id;
+  document.getElementById('cat-m-title').textContent='カテゴリを編集';
+  document.getElementById('cat-name-inp').value=c.name;
+  document.getElementById('cat-type-inp').value=c.type;
+  drawCP(c.color);openOv('cat-ov');
+}
+async function saveCat(){
+  var name=document.getElementById('cat-name-inp').value.trim();
+  var type=document.getElementById('cat-type-inp').value;
+  var color=getColor();
+  if(!name)return;
+  if(editCatId){
+    await SB.from('truck_categories').update({name:name,type:type,color:color}).eq('id',editCatId);
+    for(var i=0;i<cats.length;i++){if(cats[i].id===editCatId){cats[i].name=name;cats[i].type=type;cats[i].color=color;break;}}
+  } else {
+    var mx=0; for(var i=0;i<cats.length;i++){if(cats[i].truck_id===activeTruck&&(cats[i].sort_order||0)>mx)mx=cats[i].sort_order||0;}
+    var r=await SB.from('truck_categories').insert({truck_id:activeTruck,name:name,type:type,color:color,sort_order:mx+1}).select().single();
+    if(r.data){cats.push(r.data);cats.sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});}
+    if(!activeCat&&r.data) activeCat=r.data.id;
+  }
+  closeOv('cat-ov');drawAll();
+}
+async function deleteCat(id){
+  if(!confirm('このカテゴリを削除しますか？'))return;
+  await SB.from('truck_staples').delete().eq('category_id',id);
+  await SB.from('truck_items').delete().eq('category_id',id);
+  await SB.from('truck_categories').delete().eq('id',id);
+  cats=cats.filter(function(c){return c.id!==id;});
+  staples=staples.filter(function(s){return s.category_id!==id;});
+  items=items.filter(function(i){return i.category_id!==id;});
+  if(activeCat===id){var tc=cats.filter(function(c){return c.truck_id===activeTruck;});activeCat=tc.length?tc[0].id:null;}
+  drawAll();
+}
+
+function openAddStaple(){
+  editStapleId=null;
+  document.getElementById('staple-m-title').textContent='定番アイテムを追加';
+  document.getElementById('staple-name-inp').value='';
+  var sel=document.getElementById('staple-cat-inp');
+  var tc=cats.filter(function(c){return c.truck_id===activeTruck;});
+  sel.innerHTML=''; for(var i=0;i<tc.length;i++) sel.innerHTML+='<option value="'+tc[i].id+'">'+tc[i].name+'</option>';
+  openOv('staple-ov');
+}
+function openEditStaple(id){
+  var s=null; for(var i=0;i<staples.length;i++){if(staples[i].id===id){s=staples[i];break;}} if(!s)return;
+  editStapleId=id;
+  document.getElementById('staple-m-title').textContent='定番アイテムを編集';
+  document.getElementById('staple-name-inp').value=s.name;
+  var sel=document.getElementById('staple-cat-inp');
+  var tc=cats.filter(function(c){return c.truck_id===activeTruck;});
+  sel.innerHTML=''; for(var i=0;i<tc.length;i++) sel.innerHTML+='<option value="'+tc[i].id+'"'+(tc[i].id===s.category_id?' selected':'')+'>'+tc[i].name+'</option>';
+  openOv('staple-ov');
+}
+async function saveStaple(){
+  var name=document.getElementById('staple-name-inp').value.trim();
+  var cid=document.getElementById('staple-cat-inp').value;
+  if(!name||!cid)return;
+  if(editStapleId){
+    await SB.from('truck_staples').update({name:name,category_id:cid}).eq('id',editStapleId);
+    for(var i=0;i<staples.length;i++){if(staples[i].id===editStapleId){staples[i].name=name;staples[i].category_id=cid;break;}}
+  } else {
+    var mx=0; for(var i=0;i<staples.length;i++){if(staples[i].category_id===cid&&(staples[i].sort_order||0)>mx)mx=staples[i].sort_order||0;}
+    var r=await SB.from('truck_staples').insert({category_id:cid,name:name,sort_order:mx+1}).select().single();
+    if(r.data) staples.push(r.data);
+  }
+  closeOv('staple-ov');drawAll();
+}
+async function deleteStaple(id){
+  if(!confirm('この定番アイテムを削除しますか？'))return;
+  await SB.from('truck_staples').delete().eq('id',id);
+  staples=staples.filter(function(s){return s.id!==id;});
+  drawAll();
+}
+
+// Drag & drop for settings
+var dragSrcId=null, dragSrcType=null;
+var TD={id:null,type:null,el:null,clone:null,overEl:null};
+
+function onDragStart(e,id,type){dragSrcId=id;dragSrcType=type;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);}
+function onDragOver(e,id,type){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('.set-row').forEach(function(r){r.classList.remove('drag-over');});var el=document.getElementById('dr-'+type+'-'+id);if(el&&id!==dragSrcId)el.classList.add('drag-over');}
+function onDragLeave(id,type){var el=document.getElementById('dr-'+type+'-'+id);if(el)el.classList.remove('drag-over');}
+async function onDrop(e,id,type){if(e.preventDefault)e.preventDefault();if(!dragSrcId||dragSrcId===id||dragSrcType!==type)return;document.querySelectorAll('.set-row').forEach(function(r){r.classList.remove('drag-over','dragging');});await reorder(dragSrcId,id,type);dragSrcId=null;}
+function onDragEnd(){document.querySelectorAll('.set-row').forEach(function(r){r.classList.remove('dragging','drag-over');});}
+
+async function reorder(fromId,toId,type){
+  var arr=type==='cat'?cats:staples;
+  var fi=-1,ti=-1;
+  for(var i=0;i<arr.length;i++){if(arr[i].id===fromId)fi=i;if(arr[i].id===toId)ti=i;}
+  if(fi<0||ti<0)return;
+  var moved=arr.splice(fi,1)[0]; arr.splice(ti,0,moved);
+  for(var i=0;i<arr.length;i++) arr[i].sort_order=i+1;
+  drawSettings();
+  var tbl=type==='cat'?'truck_categories':'truck_staples';
+  var updates=arr.map(function(item,i){return SB.from(tbl).update({sort_order:i+1}).eq('id',item.id);});
+  await Promise.all(updates);
+}
+
+function onTouchDragStart(e,id,type){
+  e.stopPropagation(); TD.id=id;TD.type=type;
+  TD.el=document.getElementById('dr-'+type+'-'+id);TD.el.classList.add('dragging');
+  TD.clone=TD.el.cloneNode(true);
+  var rect=TD.el.getBoundingClientRect();
+  TD.clone.style.cssText='position:fixed;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;opacity:0.85;pointer-events:none;z-index:999;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.2);border-radius:8px;';
+  document.body.appendChild(TD.clone);
+}
+function onTouchDragMove(e,id,type){
+  if(!TD.clone)return; e.preventDefault();
+  var t=e.touches[0]; TD.clone.style.top=(t.clientY-24)+'px';
+  TD.clone.style.display='none';var under=document.elementFromPoint(t.clientX,t.clientY);TD.clone.style.display='';
+  document.querySelectorAll('.set-row').forEach(function(r){r.classList.remove('drag-over');});
+  if(under){var row=under.closest('.set-row');if(row&&row.id&&row.id!=='dr-'+type+'-'+id){TD.overEl=row;row.classList.add('drag-over');}else{TD.overEl=null;}}
+}
+function onTouchDragEnd(e,id,type){
+  if(TD.clone){TD.clone.remove();TD.clone=null;}
+  if(TD.el){TD.el.classList.remove('dragging');TD.el=null;}
+  document.querySelectorAll('.set-row').forEach(function(r){r.classList.remove('drag-over');});
+  if(TD.overEl){var tid=TD.overEl.id.replace('dr-'+type+'-','');if(tid&&tid!==id)reorder(id,tid,type);TD.overEl=null;}
+  TD.id=null;TD.type=null;
+}
+
+function drawSettings(){
+  var ce=document.getElementById('cat-settings');
+  var se=document.getElementById('staple-settings');
+  var tc=cats.filter(function(c){return c.truck_id===activeTruck;});
+  var h='';
+  for(var i=0;i<trucks.length;i++){
+    var t=trucks[i];
+    var tc2=cats.filter(function(c){return c.truck_id===t.id;});
+    h+='<div class="set-grp"><span style="flex:1">'+t.name+'</span></div>';
+    for(var j=0;j<tc2.length;j++){
+      var c=tc2[j];
+      var typeLabel=c.type==='prep'?'仕込み':'在庫';
+      h+='<div class="set-row" id="dr-cat-'+c.id+'" draggable="true"';
+      h+=' ondragstart="onDragStart(event,\''+c.id+'\',\'cat\')" ondragover="onDragOver(event,\''+c.id+'\',\'cat\')" ondragleave="onDragLeave(\''+c.id+'\',\'cat\')" ondrop="onDrop(event,\''+c.id+'\',\'cat\')" ondragend="onDragEnd()">';
+      h+='<div class="drag-handle" ontouchstart="onTouchDragStart(event,\''+c.id+'\',\'cat\')" ontouchmove="onTouchDragMove(event,\''+c.id+'\',\'cat\')" ontouchend="onTouchDragEnd(event,\''+c.id+'\',\'cat\')">⠿</div>';
+      h+='<div style="width:10px;height:10px;border-radius:50%;background:'+c.color+';flex-shrink:0"></div>';
+      h+='<div class="set-name">'+c.name+'</div>';
+      h+='<div class="set-meta">'+typeLabel+'</div>';
+      h+='<button class="ebtn" onclick="openEditCat(\''+c.id+'\')">✏️</button>';
+      h+='<button class="dbtn" onclick="deleteCat(\''+c.id+'\')">✕</button>';
+      h+='</div>';
+    }
+    h+='<div class="set-add" onclick="activeTruck=\''+t.id+'\';openAddCat()">＋ カテゴリを追加</div>';
+  }
+  ce.innerHTML=h;
+
+  h='';
+  for(var i=0;i<cats.length;i++){
+    var c=cats[i];
+    var cs=staples.filter(function(s){return s.category_id===c.id;}).sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});
+    if(!cs.length)continue;
+    var tr=null; for(var j=0;j<trucks.length;j++){if(trucks[j].id===c.truck_id){tr=trucks[j];break;}}
+    h+='<div class="set-grp" style="color:'+c.color+'">';
+    h+='<div style="width:8px;height:8px;border-radius:50%;background:'+c.color+';margin-right:6px;flex-shrink:0"></div>';
+    h+=(tr?tr.name+' / ':'')+c.name;
+    h+='</div>';
+    for(var j=0;j<cs.length;j++){
+      var s=cs[j];
+      h+='<div class="set-row" id="dr-staple-'+s.id+'" draggable="true"';
+      h+=' ondragstart="onDragStart(event,\''+s.id+'\',\'staple\')" ondragover="onDragOver(event,\''+s.id+'\',\'staple\')" ondragleave="onDragLeave(\''+s.id+'\',\'staple\')" ondrop="onDrop(event,\''+s.id+'\',\'staple\')" ondragend="onDragEnd()">';
+      h+='<div class="drag-handle" ontouchstart="onTouchDragStart(event,\''+s.id+'\',\'staple\')" ontouchmove="onTouchDragMove(event,\''+s.id+'\',\'staple\')" ontouchend="onTouchDragEnd(event,\''+s.id+'\',\'staple\')">⠿</div>';
+      h+='<div class="set-name">'+s.name+'</div>';
+      h+='<button class="ebtn" onclick="openEditStaple(\''+s.id+'\')">✏️</button>';
+      h+='<button class="dbtn" onclick="deleteStaple(\''+s.id+'\')">✕</button>';
+      h+='</div>';
+    }
+  }
+  h+='<div class="set-add" onclick="openAddStaple()">＋ 定番アイテムを追加</div>';
+  se.innerHTML=h;
+}
+
+document.getElementById('settings-btn').addEventListener('click',function(){
+  document.getElementById('main-wrap').classList.add('hide');
+  document.getElementById('settings').classList.add('show');
+  document.getElementById('hdr-left').innerHTML='';
+  document.getElementById('settings-btn').style.display='none';
+  drawSettings();
+});
+document.getElementById('back-btn').addEventListener('click',function(){
+  document.getElementById('main-wrap').classList.remove('hide');
+  document.getElementById('settings').classList.remove('show');
+  document.getElementById('hdr-left').innerHTML='<span id="hdr-title">🚚 積み込みリスト</span>';
+  document.getElementById('settings-btn').style.display='';
+});
+
+boot();
+</script>
+</body>
+</html>
