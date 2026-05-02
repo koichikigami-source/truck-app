@@ -195,6 +195,7 @@ var activeTruck=null, activeCat=null;
 var editCatId=null, editStapleId=null, qtyItemId=null;
 var staplesOpen=false, isRec=false, recog=null;
 var undoStack=null, undoTimer=null;
+var lastStapleCatId=null;
 var localOps={};
 
 async function boot() {
@@ -563,9 +564,10 @@ function openAddStaple(){
   for(var i=0;i<trucks.length;i++){
     var t=trucks[i];
     var tc=cats.filter(function(c){return c.truck_id===t.id;});
-    for(var j=0;j<tc.length;j++) sel.innerHTML+='<option value="'+tc[j].id+'">'+t.name+' / '+tc[j].name+'</option>';
+    for(var j=0;j<tc.length;j++) sel.innerHTML+='<option value="'+tc[j].id+'"'+(tc[j].id===lastStapleCatId?' selected':'')+'>'+t.name+' / '+tc[j].name+'</option>';
   }
   openOv('staple-ov');
+  setTimeout(function(){ document.getElementById('staple-name-inp').focus(); }, 300);
 }
 function openEditStaple(id){
   var s=null; for(var i=0;i<staples.length;i++){if(staples[i].id===id){s=staples[i];break;}} if(!s)return;
@@ -585,15 +587,20 @@ async function saveStaple(){
   var name=document.getElementById('staple-name-inp').value.trim();
   var cid=document.getElementById('staple-cat-inp').value;
   if(!name||!cid)return;
+  lastStapleCatId=cid;
   if(editStapleId){
     await SB.from('truck_staples').update({name:name,category_id:cid}).eq('id',editStapleId);
     for(var i=0;i<staples.length;i++){if(staples[i].id===editStapleId){staples[i].name=name;staples[i].category_id=cid;break;}}
+    closeOv('staple-ov'); drawAll();
   } else {
     var mx=0; for(var i=0;i<staples.length;i++){if(staples[i].category_id===cid&&(staples[i].sort_order||0)>mx)mx=staples[i].sort_order||0;}
     var r=await SB.from('truck_staples').insert({category_id:cid,name:name,sort_order:mx+1}).select().single();
     if(r.data) staples.push(r.data);
+    drawAll();
+    // Keep modal open for next entry, just clear name field
+    document.getElementById('staple-name-inp').value='';
+    document.getElementById('staple-name-inp').focus();
   }
-  closeOv('staple-ov');drawAll();
 }
 async function deleteStaple(id){
   if(!confirm('この定番アイテムを削除しますか？'))return;
