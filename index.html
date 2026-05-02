@@ -332,14 +332,16 @@ function itemHTML(it,isPrep){
   }
   h+='<div class="iname'+dc+'">'+nm+'</div>';
   if(isPrep&&it.urgent&&!it.checked) h+='<span class="urgent-badge">急ぎ</span>';
-  if(!isPrep&&!it.checked){
+  if(!isPrep){
     var noQty=false;
     for(var k=0;k<staples.length;k++){if(staples[k].name===it.name&&staples[k].category_id===it.category_id&&staples[k].no_qty){noQty=true;break;}}
     if(!noQty){
       h+='<div class="qty-c">';
-      h+='<button class="qbtn" onclick="chgQty(\''+id+'\',-1)">−</button>';
-      h+='<input class="qnum-inp" type="number" min="1" inputmode="numeric" pattern="[0-9]*" value="'+it.quantity+'" onchange="chgQtyDirect(\''+id+'\',this.value)" onclick="this.select()" style="width:40px;border:none;border-bottom:1px dashed var(--g2);text-align:center;font-size:14px;background:transparent;font-family:inherit;-webkit-appearance:none;padding:0;">';
-      h+='<button class="qbtn" onclick="chgQty(\''+id+'\',1)">＋</button>';
+      if(!it.checked) h+='<button class="qbtn" onclick="chgQty(\''+id+'\',-1)">−</button>';
+      h+='<span style="font-size:14px;min-width:26px;text-align:center;'+(it.checked?'color:var(--g3);':'')+'">'+it.quantity+'</span>';
+      if(!it.checked){
+        h+='<button class="qbtn" onclick="chgQty(\''+id+'\',1)">＋</button>';
+      }
       h+='</div>';
     }
   }
@@ -605,16 +607,17 @@ async function saveStaple(){
   var name=document.getElementById('staple-name-inp').value.trim();
   var cid=document.getElementById('staple-cat-inp').value;
   if(!name||!cid)return;
-  var noqty=document.getElementById('staple-noqty-inp').checked;
+  var noqty=document.getElementById('staple-noqty-inp').checked ? true : false;
   lastStapleCatId=cid;
   if(editStapleId){
     await SB.from('truck_staples').update({name:name,category_id:cid,no_qty:noqty}).eq('id',editStapleId);
+    for(var i=0;i<staples.length;i++){if(staples[i].id===editStapleId){staples[i].no_qty=noqty;break;}}
     for(var i=0;i<staples.length;i++){if(staples[i].id===editStapleId){staples[i].name=name;staples[i].category_id=cid;break;}}
     closeOv('staple-ov'); drawAll();
   } else {
     var mx=0; for(var i=0;i<staples.length;i++){if(staples[i].category_id===cid&&(staples[i].sort_order||0)>mx)mx=staples[i].sort_order||0;}
     var r=await SB.from('truck_staples').insert({category_id:cid,name:name,sort_order:mx+1,no_qty:noqty}).select().single();
-    if(r.data) staples.push(r.data);
+    if(r.data){r.data.no_qty=noqty; staples.push(r.data);}
     drawAll();
     // Keep modal open for next entry, just clear name field
     document.getElementById('staple-name-inp').value='';
