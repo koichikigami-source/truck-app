@@ -177,7 +177,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 <div id="qty-ov">
   <div id="qty-box">
     <div id="qty-item-name">数量</div>
-    <input id="qty-inp" type="number" min="1" value="1">
+    <input id="qty-inp" type="number" min="1" value="1" inputmode="numeric" pattern="[0-9]*">
     <button id="qty-ok" onclick="saveQty()">OK</button>
   </div>
 </div>
@@ -443,7 +443,7 @@ async function delItem(id){
   await SB.from('truck_items').delete().eq('id',id);
 }
 
-function clearChecked(){
+async function clearChecked(){
   var si=items.filter(function(i){return i.category_id===activeCat&&i.checked;});
   if(!si.length)return;
   try{var ac=new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.frequency.value=330;g.gain.setValueAtTime(0.25,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.2);o.start();o.stop(ac.currentTime+0.2);}catch(e){}
@@ -451,7 +451,7 @@ function clearChecked(){
   var ids=si.map(function(i){return i.id;});
   items=items.filter(function(i){return ids.indexOf(i.id)===-1;}); drawAll();
   showUndo(si.length+'件の完了済みを削除');
-  SB.from('truck_items').delete().in('id',ids);
+  await SB.from('truck_items').delete().in('id',ids);
 }
 
 function showUndo(msg){
@@ -477,7 +477,11 @@ function openQty(id,name,qty){
   document.getElementById('qty-item-name').textContent=name;
   document.getElementById('qty-inp').value=qty;
   document.getElementById('qty-ov').classList.add('open');
-  setTimeout(function(){document.getElementById('qty-inp').select();},100);
+  setTimeout(function(){
+    var inp=document.getElementById('qty-inp');
+    inp.focus();
+    inp.select();
+  },300);
 }
 async function saveQty(){
   var q=parseInt(document.getElementById('qty-inp').value)||1;
