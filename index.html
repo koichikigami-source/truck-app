@@ -814,7 +814,10 @@ function openEditSubcat(id){
   drawSubcatCP(s.color); openOv('subcat-ov');
 }
 function drawSubcatCP(sel){
-  var h=''; for(var i=0;i<COLORS.length;i++) h+='<div class="csw'+(COLORS[i]===sel?' on':'')+'" style="background:'+COLORS[i]+'" onclick="pickSubcatColor(''+COLORS[i]+'')"></div>';
+  var h='';
+  for(var i=0;i<COLORS.length;i++){
+    h+='<div class="csw'+(COLORS[i]===sel?' on':'')+'" style="background:'+COLORS[i]+'" onclick="pickSubcatColor(''+COLORS[i]+'')"></div>';
+  }
   document.getElementById('subcat-cp').innerHTML=h;
 }
 function pickSubcatColor(c){drawSubcatCP(c);}
