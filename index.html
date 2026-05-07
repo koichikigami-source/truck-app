@@ -350,7 +350,7 @@ function drawMain(){
       var noSub=ci.filter(function(it){return !it.subcategory_id;});
       if(noSub.length){
         sortItems(noSub);
-        h+='<div class="a-sec"><div class="a-hdr" style="background:#f5f4f0" onclick="togSec('nosub')">';
+        h+='<div class="a-sec"><div class="a-hdr" style="background:#f5f4f0" onclick="togSec(&quot;nosub&quot;)">';
         h+='<div class="a-dot" style="background:#999"></div>';
         h+='<div class="a-lbl">未分類</div>';
         h+='<div class="a-cnt">'+noSub.length+'</div>';
