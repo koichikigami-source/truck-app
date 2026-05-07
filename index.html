@@ -865,6 +865,18 @@ function drawSettings(){
       h+='<button class="ebtn" onclick="openEditCat(\''+c.id+'\')">✏️</button>';
       h+='<button class="dbtn" onclick="deleteCat(\''+c.id+'\')">✕</button>';
       h+='</div>';
+      var catSubs=subcats.filter(function(s){return s.category_id===c.id;}).sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});
+      for(var k=0;k<catSubs.length;k++){
+        var sc=catSubs[k];
+        h+='<div class="set-row" style="margin-left:28px;background:#fafafa;">';
+        h+='<div style="width:10px;height:10px;border-radius:50%;background:'+sc.color+';flex-shrink:0"></div>';
+        h+='<div class="set-name">└ '+sc.name+'</div>';
+        h+='<div class="set-meta">サブカテゴリ</div>';
+        h+='<button class="ebtn" onclick="openEditSubcat(\''+sc.id+'\')">✏️</button>';
+        h+='<button class="dbtn" onclick="deleteSubcat(\''+sc.id+'\')">✕</button>';
+        h+='</div>';
+      }
+      h+='<div class="set-add" style="margin-left:28px;" onclick="openAddSubcat(\''+c.id+'\')">＋ サブカテゴリを追加</div>';
     }
     h+='<div class="set-add" onclick="activeTruck=\''+t.id+'\';openAddCat()">＋ カテゴリを追加</div>';
   }
