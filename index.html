@@ -43,6 +43,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 #staple-subcat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
 .st-subtab{padding:6px 12px;border-radius:18px;border:1px solid var(--g2);font-size:12px;cursor:pointer;background:var(--w);color:var(--tx2);}
 .st-subtab.on{background:var(--gn);border-color:var(--gn);color:#fff;font-weight:700;}
+.st-subtab.colored{font-weight:600;}
+.st-subtab.colored.on{font-weight:700;}
 .s-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--g2);font-size:13px;cursor:pointer;background:var(--w);transition:all .2s;}
 .s-chip.added,.s-chip.exists{background:var(--gn2);border-color:var(--gn);color:var(--gn);}
 .s-chip.added{transform:scale(1.05);}
@@ -311,7 +313,9 @@ function drawMain(){
       h+="<div class='st-subtab "+(activeStapleSubcat==='all'?'on':'')+"' onclick=\"setStapleSubcat('all')\">すべて</div>";
       for(var ti=0;ti<stapleSubcats.length;ti++){
         var stc=stapleSubcats[ti];
-        h+='<div class="st-subtab '+(activeStapleSubcat===stc.id?'on':'')+'" onclick="setStapleSubcat(\''+stc.id+'\')">'+stc.name+'</div>';
+        var isOn=(activeStapleSubcat===stc.id);
+        var stcStyle=getSubcatTabStyle(stc.color,isOn);
+        h+='<div class="st-subtab colored '+(isOn?'on':'')+'" style="'+stcStyle+'" onclick="setStapleSubcat(\''+stc.id+'\')">'+stc.name+'</div>';
       }
       var hasNoSub=cs.some(function(s){return !s.subcategory_id;});
       if(hasNoSub) h+="<div class='st-subtab "+(activeStapleSubcat==='nosub'?'on':'')+"' onclick=\"setStapleSubcat('nosub')\">未分類</div>";
@@ -478,6 +482,39 @@ function setTruck(id){
 function setCat(id){activeCat=id;staplesOpen=false;activeStapleSubcat='all';drawAll();}
 function toggleStaples(){staplesOpen=!staplesOpen;drawMain();}
 function setStapleSubcat(id){activeStapleSubcat=id;staplesOpen=true;drawMain();}
+
+function parseColorToRgb(color){
+  if(!color) return null;
+  color=(''+color).trim();
+  var m=color.match(/^#?([0-9a-f]{6})$/i);
+  if(m){
+    var hex=m[1];
+    return {r:parseInt(hex.slice(0,2),16),g:parseInt(hex.slice(2,4),16),b:parseInt(hex.slice(4,6),16)};
+  }
+  m=color.match(/^#?([0-9a-f]{3})$/i);
+  if(m){
+    var h=m[1];
+    return {r:parseInt(h[0]+h[0],16),g:parseInt(h[1]+h[1],16),b:parseInt(h[2]+h[2],16)};
+  }
+  m=color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if(m){return {r:+m[1],g:+m[2],b:+m[3]};}
+  return null;
+}
+function rgbToCss(rgb,a){return 'rgba('+rgb.r+','+rgb.g+','+rgb.b+','+a+')';}
+function readableTextColor(color){
+  var rgb=parseColorToRgb(color);
+  if(!rgb) return '#222';
+  var yiq=((rgb.r*299)+(rgb.g*587)+(rgb.b*114))/1000;
+  return yiq>=150?'#222':'#fff';
+}
+function getSubcatTabStyle(color,on){
+  var rgb=parseColorToRgb(color);
+  if(!rgb) return '';
+  if(on){
+    return 'background:'+color+';border-color:'+color+';color:'+readableTextColor(color)+';';
+  }
+  return 'background:'+rgbToCss(rgb,0.14)+';border-color:'+color+';color:#222;';
+}
 
 async function doAdd(){
   var inp=document.getElementById('add-input');
