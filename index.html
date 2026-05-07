@@ -41,7 +41,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 #staples-panel.open{display:block;}
 #staple-chips{display:flex;gap:6px;flex-wrap:wrap;}
 .s-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--g2);font-size:13px;cursor:pointer;background:var(--w);transition:all .2s;}
-.s-chip.added{background:var(--gn2);border-color:var(--gn);color:var(--gn);transform:scale(1.05);}
+.s-chip.added,.s-chip.exists{background:var(--gn2);border-color:var(--gn);color:var(--gn);}
+.s-chip.added{transform:scale(1.05);}
 #clear-btn-wrap{display:flex;justify-content:flex-end;margin-bottom:8px;}
 #clear-btn{padding:7px 14px;border-radius:20px;border:1px solid var(--rd);background:transparent;color:var(--rd);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;}
 /* items */
@@ -191,7 +192,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 <div id="qty-ov">
   <div id="qty-box">
     <div id="qty-item-name">数量</div>
-    <input id="qty-inp" type="number" min="1" value="1" inputmode="numeric" pattern="[0-9]*">
+    <input id="qty-inp" type="tel" min="1" value="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
     <button id="qty-ok" onclick="saveQty()">OK</button>
   </div>
 </div>
@@ -299,7 +300,10 @@ function drawMain(){
     h+='<div id="staples-toggle" onclick="toggleStaples()"><span>📋 定番リストから追加</span><span>'+(staplesOpen?'▲':'▼')+'</span></div>';
     h+='<div id="staples-panel"'+(staplesOpen?' class="open"':'')+'>';
     h+='<div id="staple-chips">';
-    for(var i=0;i<cs.length;i++) h+='<div class="s-chip" id="chip-'+cs[i].id+'" onclick="addFromStaple(\''+cs[i].id+'\')">'+cs[i].name+'</div>';
+    for(var i=0;i<cs.length;i++){
+      var exists=items.some(function(it){return it.category_id===activeCat&&it.name===cs[i].name&&!it.checked;});
+      h+='<div class="s-chip '+(exists?'exists':'')+'" id="chip-'+cs[i].id+'" onclick="addFromStaple(\''+cs[i].id+'\')">'+cs[i].name+'</div>';
+    }
     h+='</div></div>';
   }
   h+='</div>';
@@ -471,6 +475,15 @@ async function doAdd(){
 
 var pendingStapleId=null;
 
+function focusQtyInputNow(){
+  var inp=document.getElementById('qty-inp');
+  if(!inp)return;
+  // タップ直後の処理内でfocusすると、スマホでも数字キーボードが出やすい
+  inp.focus({preventScroll:true});
+  inp.select();
+  setTimeout(function(){try{inp.focus({preventScroll:true});inp.select();}catch(e){inp.focus();}},50);
+}
+
 async function addFromStaple(sid){
   var s=null; for(var i=0;i<staples.length;i++){if(staples[i].id===sid){s=staples[i];break;}} if(!s)return;
   // Sound feedback
@@ -497,10 +510,7 @@ async function addFromStaple(sid){
   document.getElementById('qty-item-name').textContent=s.name;
   document.getElementById('qty-inp').value=lq;
   document.getElementById('qty-ov').classList.add('open');
-  setTimeout(function(){
-    var inp=document.getElementById('qty-inp');
-    inp.focus(); inp.select();
-  },300);
+  focusQtyInputNow();
 }
 
 async function confirmStapleQty(){
@@ -596,11 +606,7 @@ function openQty(id,name,qty){
   document.getElementById('qty-item-name').textContent=name;
   document.getElementById('qty-inp').value=qty;
   document.getElementById('qty-ov').classList.add('open');
-  setTimeout(function(){
-    var inp=document.getElementById('qty-inp');
-    inp.focus();
-    inp.select();
-  },300);
+  focusQtyInputNow();
 }
 async function saveQty(){
   if(pendingStapleId){
@@ -883,6 +889,17 @@ function drawSettings(){
   ce.innerHTML=h;
 
   h='';
+  function drawStapleRow(s,indent){
+    var ml=indent?' style="margin-left:'+indent+'px;"':'';
+    var row='<div class="set-row"'+ml+' id="dr-staple-'+s.id+'" draggable="true"';
+    row+=' ondragstart="onDragStart(event,\''+s.id+'\',\'staple\')" ondragover="onDragOver(event,\''+s.id+'\',\'staple\')" ondragleave="onDragLeave(\''+s.id+'\',\'staple\')" ondrop="onDrop(event,\''+s.id+'\',\'staple\')" ondragend="onDragEnd()">';
+    row+='<div class="drag-handle" ontouchstart="onTouchDragStart(event,\''+s.id+'\',\'staple\')" ontouchmove="onTouchDragMove(event,\''+s.id+'\',\'staple\')" ontouchend="onTouchDragEnd(event,\''+s.id+'\',\'staple\')">⠿</div>';
+    row+='<div class="set-name">'+s.name+'</div>';
+    row+='<button class="ebtn" onclick="openEditStaple(\''+s.id+'\')">✏️</button>';
+    row+='<button class="dbtn" onclick="deleteStaple(\''+s.id+'\')">✕</button>';
+    row+='</div>';
+    return row;
+  }
   for(var i=0;i<cats.length;i++){
     var c=cats[i];
     var cs=staples.filter(function(s){return s.category_id===c.id;}).sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});
@@ -892,15 +909,22 @@ function drawSettings(){
     h+='<div style="width:8px;height:8px;border-radius:50%;background:'+c.color+';margin-right:6px;flex-shrink:0"></div>';
     h+=(tr?tr.name+' / ':'')+c.name;
     h+='</div>';
-    for(var j=0;j<cs.length;j++){
-      var s=cs[j];
-      h+='<div class="set-row" id="dr-staple-'+s.id+'" draggable="true"';
-      h+=' ondragstart="onDragStart(event,\''+s.id+'\',\'staple\')" ondragover="onDragOver(event,\''+s.id+'\',\'staple\')" ondragleave="onDragLeave(\''+s.id+'\',\'staple\')" ondrop="onDrop(event,\''+s.id+'\',\'staple\')" ondragend="onDragEnd()">';
-      h+='<div class="drag-handle" ontouchstart="onTouchDragStart(event,\''+s.id+'\',\'staple\')" ontouchmove="onTouchDragMove(event,\''+s.id+'\',\'staple\')" ontouchend="onTouchDragEnd(event,\''+s.id+'\',\'staple\')">⠿</div>';
-      h+='<div class="set-name">'+s.name+'</div>';
-      h+='<button class="ebtn" onclick="openEditStaple(\''+s.id+'\')">✏️</button>';
-      h+='<button class="dbtn" onclick="deleteStaple(\''+s.id+'\')">✕</button>';
-      h+='</div>';
+    var catSubs2=subcats.filter(function(sc){return sc.category_id===c.id;}).sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});
+    for(var k=0;k<catSubs2.length;k++){
+      var sc=catSubs2[k];
+      var scItems=cs.filter(function(st){return st.subcategory_id===sc.id;});
+      if(!scItems.length)continue;
+      h+='<div class="set-row" style="margin-left:20px;background:#fafafa;">';
+      h+='<div style="width:10px;height:10px;border-radius:50%;background:'+sc.color+';flex-shrink:0"></div>';
+      h+='<div class="set-name">└ '+sc.name+'</div><div class="set-meta">サブリスト</div></div>';
+      for(var j=0;j<scItems.length;j++){h+=drawStapleRow(scItems[j],40);}
+    }
+    var noSubStaples=cs.filter(function(st){return !st.subcategory_id;});
+    if(noSubStaples.length&&catSubs2.length){
+      h+='<div class="set-row" style="margin-left:20px;background:#fafafa;"><div class="set-name">└ サブリストなし</div></div>';
+      for(var j=0;j<noSubStaples.length;j++){h+=drawStapleRow(noSubStaples[j],40);}
+    } else {
+      for(var j=0;j<noSubStaples.length;j++){h+=drawStapleRow(noSubStaples[j],0);}
     }
   }
   h+='<div class="set-add" onclick="openAddStaple()">＋ 定番アイテムを追加</div>';
