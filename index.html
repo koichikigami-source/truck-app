@@ -336,7 +336,7 @@ function drawMain(){
         var doneCount=subItems.filter(function(it){return it.checked;}).length;
         var pct=Math.round(doneCount/subItems.length*100);
         h+='<div class="a-sec" id="sec-'+sub.id+'">';
-        h+='<div class="a-hdr" style="background:'+sub.color+'18" onclick="togSec(''+sub.id+'')">';
+        h+='<div class="a-hdr" style="background:'+sub.color+'18" onclick="togSec(&quot;'+sub.id+'&quot;)">';
         h+='<div class="a-dot" style="background:'+sub.color+'"></div>';
         h+='<div class="a-lbl">'+sub.name+'</div>';
         h+='<div class="a-cnt">'+doneCount+'/'+subItems.length+'</div>';
