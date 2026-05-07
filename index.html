@@ -40,6 +40,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 #staples-panel{border-top:1px solid var(--g2);padding:10px 12px;display:none;}
 #staples-panel.open{display:block;}
 #staple-chips{display:flex;gap:6px;flex-wrap:wrap;}
+#staple-subcat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.st-subtab{padding:6px 12px;border-radius:18px;border:1px solid var(--g2);font-size:12px;cursor:pointer;background:var(--w);color:var(--tx2);}
+.st-subtab.on{background:var(--gn);border-color:var(--gn);color:#fff;font-weight:700;}
 .s-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--g2);font-size:13px;cursor:pointer;background:var(--w);transition:all .2s;}
 .s-chip.added,.s-chip.exists{background:var(--gn2);border-color:var(--gn);color:var(--gn);}
 .s-chip.added{transform:scale(1.05);}
@@ -211,6 +214,7 @@ var editCatId=null, editStapleId=null, qtyItemId=null;
 var staplesOpen=false, isRec=false, recog=null;
 var undoStack=null, undoTimer=null;
 var lastStapleCatId=null;
+var activeStapleSubcat='all';
 var localOps={};
 
 async function boot() {
@@ -299,10 +303,32 @@ function drawMain(){
   if(cs.length){
     h+='<div id="staples-toggle" onclick="toggleStaples()"><span>📋 定番リストから追加</span><span>'+(staplesOpen?'▲':'▼')+'</span></div>';
     h+='<div id="staples-panel"'+(staplesOpen?' class="open"':'')+'>';
+    var stapleSubcats=subcats.filter(function(s){return s.category_id===activeCat;}).sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});
+    var hasCurrentSub=(activeStapleSubcat==='all')||(activeStapleSubcat==='nosub')||stapleSubcats.some(function(sc){return sc.id===activeStapleSubcat;});
+    if(!hasCurrentSub) activeStapleSubcat='all';
+    if(stapleSubcats.length){
+      h+='<div id="staple-subcat-tabs">';
+      h+="<div class='st-subtab "+(activeStapleSubcat==='all'?'on':'')+"' onclick=\"setStapleSubcat('all')\">すべて</div>";
+      for(var ti=0;ti<stapleSubcats.length;ti++){
+        var stc=stapleSubcats[ti];
+        h+='<div class="st-subtab '+(activeStapleSubcat===stc.id?'on':'')+'" onclick="setStapleSubcat(\''+stc.id+'\')">'+stc.name+'</div>';
+      }
+      var hasNoSub=cs.some(function(s){return !s.subcategory_id;});
+      if(hasNoSub) h+="<div class='st-subtab "+(activeStapleSubcat==='nosub'?'on':'')+"' onclick=\"setStapleSubcat('nosub')\">未分類</div>";
+      h+='</div>';
+    }
+    var showCs=cs.slice();
+    if(activeStapleSubcat!=='all'){
+      showCs=cs.filter(function(s){return activeStapleSubcat==='nosub'?!s.subcategory_id:s.subcategory_id===activeStapleSubcat;});
+    }
     h+='<div id="staple-chips">';
-    for(var i=0;i<cs.length;i++){
-      var exists=items.some(function(it){return it.category_id===activeCat&&it.name===cs[i].name&&!it.checked;});
-      h+='<div class="s-chip '+(exists?'exists':'')+'" id="chip-'+cs[i].id+'" onclick="addFromStaple(\''+cs[i].id+'\')">'+cs[i].name+'</div>';
+    if(showCs.length){
+      for(var i=0;i<showCs.length;i++){
+        var exists=items.some(function(it){return it.category_id===activeCat&&it.name===showCs[i].name&&!it.checked;});
+        h+='<div class="s-chip '+(exists?'exists':'')+'" id="chip-'+showCs[i].id+'" onclick="addFromStaple(\''+showCs[i].id+'\')">'+showCs[i].name+'</div>';
+      }
+    } else {
+      h+='<div style="font-size:12px;color:var(--tx2);padding:4px 2px;">このサブカテゴリには定番アイテムがありません</div>';
     }
     h+='</div></div>';
   }
@@ -443,13 +469,15 @@ function attachSwipe(){
 
 function setTruck(id){
   activeTruck=id;
+  activeStapleSubcat='all';
   var tc=cats.filter(function(c){return c.truck_id===id;});
   activeCat=tc.length?tc[0].id:null;
   staplesOpen=false;
   drawAll();
 }
-function setCat(id){activeCat=id;staplesOpen=false;drawAll();}
+function setCat(id){activeCat=id;staplesOpen=false;activeStapleSubcat='all';drawAll();}
 function toggleStaples(){staplesOpen=!staplesOpen;drawMain();}
+function setStapleSubcat(id){activeStapleSubcat=id;staplesOpen=true;drawMain();}
 
 async function doAdd(){
   var inp=document.getElementById('add-input');
