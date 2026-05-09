@@ -155,11 +155,12 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
     <div class="m-title" id="cat-m-title">カテゴリを追加</div>
     <div class="m-field"><div class="m-label">カテゴリ名</div><input class="m-inp" id="cat-name-inp" placeholder="例：ドライ"></div>
     <div class="m-field"><div class="m-label">種類</div>
-      <select class="m-inp" id="cat-type-inp">
+      <select class="m-inp" id="cat-type-inp" onchange="toggleCatUnitInput()">
         <option value="stock">在庫（数量あり）</option>
         <option value="prep">仕込み（数量なし・急ぎあり）</option>
       </select>
     </div>
+    <div class="m-field" id="cat-unit-wrap"><div class="m-label">単位</div><input class="m-inp" id="cat-unit-inp" placeholder="例：個 / kg / 本 / 袋"></div>
     <div class="m-field"><div class="m-label">色</div><div class="cp" id="cp"></div></div>
     <div class="m-acts">
       <button class="mbtn" onclick="closeOv('cat-ov')">キャンセル</button>
@@ -434,12 +435,14 @@ function itemHTML(it,isPrep){
     var noQty=false;
     for(var k=0;k<staples.length;k++){if(staples[k].name===it.name&&staples[k].category_id===it.category_id&&staples[k].no_qty){noQty=true;break;}}
     if(!noQty){
+      var unit=getCatUnit(it.category_id);
+      var unitHtml=unit?'<span style="font-size:12px;color:var(--tx2);margin-left:2px;">'+escHtml(unit)+'</span>':'';
       if(it.checked){
-        h+='<span style="font-size:14px;min-width:26px;text-align:center;color:var(--g3);">'+it.quantity+'</span>';
+        h+='<span style="font-size:14px;min-width:26px;text-align:center;color:var(--g3);">'+it.quantity+unitHtml+'</span>';
       } else {
         h+='<div class="qty-c">';
         h+='<button class="qbtn" onclick="chgQty(\''+id+'\',-1)">−</button>';
-        h+='<div class="qnum" onclick="openQty(\''+id+'\',\''+nmR+'\','+it.quantity+')">'+it.quantity+'</div>';
+        h+='<div class="qnum" onclick="openQty(\''+id+'\',\''+nmR+'\','+it.quantity+')">'+it.quantity+'</div>'+unitHtml;
         h+='<button class="qbtn" onclick="chgQty(\''+id+'\',1)">＋</button>';
         h+='</div>';
       }
@@ -572,7 +575,8 @@ async function addFromStaple(sid){
   // Show qty modal for quantity input
   pendingStapleId=sid;
   var lq=s.last_qty||1;
-  document.getElementById('qty-item-name').textContent=s.name;
+  var su=getCatUnit(s.category_id);
+  document.getElementById('qty-item-name').textContent=s.name+(su?'（単位：'+su+'）':'');
   document.getElementById('qty-inp').value=lq;
   document.getElementById('qty-ov').classList.add('open');
   focusQtyInputNow();
@@ -668,7 +672,9 @@ async function doUndo(){
 
 function openQty(id,name,qty){
   qtyItemId=id;
-  document.getElementById('qty-item-name').textContent=name;
+  var itForUnit=null; for(var ui=0;ui<items.length;ui++){if(items[ui].id===id){itForUnit=items[ui];break;}}
+  var ou=itForUnit?getCatUnit(itForUnit.category_id):'';
+  document.getElementById('qty-item-name').textContent=name+(ou?'（単位：'+ou+'）':'');
   document.getElementById('qty-inp').value=qty;
   document.getElementById('qty-ov').classList.add('open');
   focusQtyInputNow();
@@ -710,11 +716,41 @@ function drawCP(sel){
 function pickColor(c){drawCP(c);}
 function getColor(){var el=document.querySelector('.csw.on');return el?el.style.backgroundColor:COLORS[0];}
 
+var CAT_UNITS_KEY='jk_category_units_v1';
+function loadCatUnits(){
+  try{return JSON.parse(localStorage.getItem(CAT_UNITS_KEY)||'{}');}catch(e){return {};}
+}
+function saveCatUnits(map){
+  try{localStorage.setItem(CAT_UNITS_KEY,JSON.stringify(map));}catch(e){}
+}
+function getCatUnit(catId){
+  var map=loadCatUnits();
+  if(map[catId]!==undefined) return map[catId];
+  for(var i=0;i<cats.length;i++){if(cats[i].id===catId&&cats[i].unit!==undefined)return cats[i].unit||'';}
+  return '';
+}
+function setCatUnitLocal(catId,unit){
+  if(!catId)return;
+  var map=loadCatUnits();
+  map[catId]=(unit||'').trim();
+  saveCatUnits(map);
+  for(var i=0;i<cats.length;i++){if(cats[i].id===catId){cats[i].unit=map[catId];break;}}
+}
+function escHtml(v){return (v===undefined||v===null?'':String(v)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function toggleCatUnitInput(){
+  var typeEl=document.getElementById('cat-type-inp');
+  var wrap=document.getElementById('cat-unit-wrap');
+  if(!typeEl||!wrap)return;
+  wrap.style.display=(typeEl.value==='prep')?'none':'';
+}
+
 function openAddCat(){
   editCatId=null;
   document.getElementById('cat-m-title').textContent='カテゴリを追加';
   document.getElementById('cat-name-inp').value='';
   document.getElementById('cat-type-inp').value='stock';
+  document.getElementById('cat-unit-inp').value='';
+  toggleCatUnitInput();
   drawCP(COLORS[0]);openOv('cat-ov');
 }
 function openEditCat(id){
@@ -723,20 +759,24 @@ function openEditCat(id){
   document.getElementById('cat-m-title').textContent='カテゴリを編集';
   document.getElementById('cat-name-inp').value=c.name;
   document.getElementById('cat-type-inp').value=c.type;
+  document.getElementById('cat-unit-inp').value=getCatUnit(c.id);
+  toggleCatUnitInput();
   drawCP(c.color);openOv('cat-ov');
 }
 async function saveCat(){
   var name=document.getElementById('cat-name-inp').value.trim();
   var type=document.getElementById('cat-type-inp').value;
+  var unit=type==='prep'?'':document.getElementById('cat-unit-inp').value.trim();
   var color=getColor();
   if(!name)return;
   if(editCatId){
     await SB.from('truck_categories').update({name:name,type:type,color:color}).eq('id',editCatId);
-    for(var i=0;i<cats.length;i++){if(cats[i].id===editCatId){cats[i].name=name;cats[i].type=type;cats[i].color=color;break;}}
+    setCatUnitLocal(editCatId,unit);
+    for(var i=0;i<cats.length;i++){if(cats[i].id===editCatId){cats[i].name=name;cats[i].type=type;cats[i].color=color;cats[i].unit=unit;break;}}
   } else {
     var mx=0; for(var i=0;i<cats.length;i++){if(cats[i].truck_id===activeTruck&&(cats[i].sort_order||0)>mx)mx=cats[i].sort_order||0;}
     var r=await SB.from('truck_categories').insert({truck_id:activeTruck,name:name,type:type,color:color,sort_order:mx+1}).select().single();
-    if(r.data){cats.push(r.data);cats.sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});}
+    if(r.data){r.data.unit=unit;setCatUnitLocal(r.data.id,unit);cats.push(r.data);cats.sort(function(a,b){return(a.sort_order||0)-(b.sort_order||0);});}
     if(!activeCat&&r.data) activeCat=r.data.id;
   }
   closeOv('cat-ov');drawAll();
@@ -926,7 +966,8 @@ function drawSettings(){
     h+='<div class="set-grp"><span style="flex:1">'+t.name+'</span></div>';
     for(var j=0;j<tc2.length;j++){
       var c=tc2[j];
-      var typeLabel=c.type==='prep'?'仕込み':'在庫';
+      var unitLabel=c.type==='prep'?'':' / 単位：'+(getCatUnit(c.id)||'未設定');
+      var typeLabel=c.type==='prep'?'仕込み':'在庫'+unitLabel;
       h+='<div class="set-row" id="dr-cat-'+c.id+'" draggable="true"';
       h+=' ondragstart="onDragStart(event,\''+c.id+'\',\'cat\')" ondragover="onDragOver(event,\''+c.id+'\',\'cat\')" ondragleave="onDragLeave(\''+c.id+'\',\'cat\')" ondrop="onDrop(event,\''+c.id+'\',\'cat\')" ondragend="onDragEnd()">';
       h+='<div class="drag-handle" ontouchstart="onTouchDragStart(event,\''+c.id+'\',\'cat\')" ontouchmove="onTouchDragMove(event,\''+c.id+'\',\'cat\')" ontouchend="onTouchDragEnd(event,\''+c.id+'\',\'cat\')">⠿</div>';
