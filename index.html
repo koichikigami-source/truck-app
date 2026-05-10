@@ -191,7 +191,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 <div id="qty-ov">
   <div id="qty-box">
     <div id="qty-item-name">数量</div>
-    <input id="qty-inp" type="number" min="0" step="0.1" value="1" inputmode="decimal">
+    <input id="qty-inp" type="number" min="0" step="0.1" value="1" inputmode="decimal" autocomplete="off" enterkeyhint="done">
     <button id="qty-ok" onclick="saveQty()">OK</button>
   </div>
 </div>
@@ -381,6 +381,12 @@ function drawMain(){
   attachSwipe();
 }
 
+function displayQty(q){
+  var n=parseFloat(q);
+  if(isNaN(n)) return q;
+  n=Math.round(n*10)/10;
+  return (Math.abs(n-Math.round(n))<0.0001)?String(Math.round(n)):String(n);
+}
 function itemHTML(it,isPrep){
   var dc=it.checked?' done':'';
   var fc=it.checked?' faded':'';
@@ -401,11 +407,11 @@ function itemHTML(it,isPrep){
     for(var k=0;k<staples.length;k++){if(staples[k].name===it.name&&staples[k].category_id===it.category_id&&staples[k].no_qty){noQty=true;break;}}
     if(!noQty){
       if(it.checked){
-        h+='<span style="font-size:14px;min-width:26px;text-align:center;color:var(--g3);">'+it.quantity+'</span>';
+        h+='<span style="font-size:14px;min-width:26px;text-align:center;color:var(--g3);">'+displayQty(it.quantity)+'</span>';
       } else {
         h+='<div class="qty-c">';
         h+='<button class="qbtn" onclick="chgQty(\''+id+'\',-1)">−</button>';
-        h+='<div class="qnum" onclick="openQty(\''+id+'\',\''+nmR+'\','+it.quantity+')">'+it.quantity+'</div>';
+        h+='<div class="qnum" onclick="openQty(\''+id+'\',\''+nmR+'\','+displayQty(it.quantity)+')">'+displayQty(it.quantity)+'</div>';
         h+='<button class="qbtn" onclick="chgQty(\''+id+'\',1)">＋</button>';
         h+='</div>';
       }
@@ -469,6 +475,22 @@ async function doAdd(){
   inp.value=''; drawAll();
 }
 
+function normalizeQtyValue(v, fallback){
+  if(v===null || v===undefined || String(v).trim()==='') return fallback;
+  var n=parseFloat(String(v).replace(',', '.'));
+  if(isNaN(n)) return fallback;
+  return Math.round(Math.max(0,n)*10)/10;
+}
+function focusQtyInput(){
+  var inp=document.getElementById('qty-inp');
+  if(!inp)return;
+  inp.focus();
+  inp.select();
+  // iPhone/Androidでキーボードが出ない時があるので、少し遅らせてもう一度フォーカス
+  setTimeout(function(){try{inp.focus();inp.select();}catch(e){}},80);
+  setTimeout(function(){try{inp.focus();inp.select();}catch(e){}},300);
+}
+function makeTempId(){return 'tmp-'+Date.now()+'-'+Math.floor(Math.random()*100000);}
 var pendingStapleId=null;
 
 async function addFromStaple(sid){
@@ -497,14 +519,13 @@ async function addFromStaple(sid){
   document.getElementById('qty-item-name').textContent=s.name;
   document.getElementById('qty-inp').value=lq;
   document.getElementById('qty-ov').classList.add('open');
-  setTimeout(function(){
-    var inp=document.getElementById('qty-inp');
-    inp.focus(); inp.select();
-  },300);
+  focusQtyInput();
 }
 
 async function confirmStapleQty(){
-  var q=Math.round((parseFloat(document.getElementById('qty-inp').value)||1)*10)/10;
+  var raw=document.getElementById('qty-inp').value;
+  var q=normalizeQtyValue(raw, null);
+  if(q===null){ focusQtyInput(); return; }
   document.getElementById('qty-ov').classList.remove('open');
   if(!pendingStapleId){return;}
   var s=null; for(var i=0;i<staples.length;i++){if(staples[i].id===pendingStapleId){s=staples[i];break;}}
@@ -515,13 +536,23 @@ async function confirmStapleQty(){
   s.last_qty=q;
   var ex=null; for(var i=0;i<items.length;i++){if(items[i].category_id===activeCat&&items[i].name===s.name&&!items[i].checked){ex=items[i];break;}}
   if(ex){
-    await SB.from('truck_items').update({quantity:q}).eq('id',ex.id);
     ex.quantity=q;
+    drawAll();
+    var up=await SB.from('truck_items').update({quantity:q}).eq('id',ex.id);
+    if(up.error) alert('保存エラー: '+up.error.message);
   } else {
+    // 先に画面へ出す。通信が遅くても、OKを押した直後にリストへ上がる。
+    var temp={id:makeTempId(),truck_id:activeTruck,category_id:activeCat,subcategory_id:s.subcategory_id||null,name:s.name,quantity:q,checked:false,urgent:false};
+    items.push(temp);
+    drawAll();
     var r=await SB.from('truck_items').insert({truck_id:activeTruck,category_id:activeCat,subcategory_id:s.subcategory_id||null,name:s.name,quantity:q,checked:false,urgent:false}).select().single();
-    if(r.data) items.push(r.data);
+    if(r.data){
+      for(var ti=0;ti<items.length;ti++){if(items[ti].id===temp.id){items[ti]=r.data;break;}}
+      drawAll();
+    } else if(r.error){
+      alert('保存エラー: '+r.error.message);
+    }
   }
-  drawAll();
 }
 
 async function togChk(id){
@@ -542,16 +573,18 @@ async function togUrgent(id){
 
 async function chgQtyDirect(id,val){
   var it=null; for(var i=0;i<items.length;i++){if(items[i].id===id){it=items[i];break;}} if(!it)return;
-  var nq=Math.round(Math.max(0,parseFloat(val)||0)*10)/10;
-  it.quantity=nq;
-  await SB.from('truck_items').update({quantity:nq}).eq('id',id);
+  var nq=normalizeQtyValue(val, 0);
+  it.quantity=nq; drawAll();
+  var up=await SB.from('truck_items').update({quantity:nq}).eq('id',id);
+  if(up.error) alert('保存エラー: '+up.error.message);
 }
 
 async function chgQty(id,d){
   var it=null; for(var i=0;i<items.length;i++){if(items[i].id===id){it=items[i];break;}} if(!it)return;
-  var nq=Math.max(1,it.quantity+d);
+  var nq=Math.round(Math.max(0,(parseFloat(it.quantity)||0)+d)*10)/10;
   it.quantity=nq; drawAll();
-  await SB.from('truck_items').update({quantity:nq}).eq('id',id);
+  var up=await SB.from('truck_items').update({quantity:nq}).eq('id',id);
+  if(up.error) alert('保存エラー: '+up.error.message);
 }
 
 async function delItem(id){
@@ -596,26 +629,30 @@ function openQty(id,name,qty){
   document.getElementById('qty-item-name').textContent=name;
   document.getElementById('qty-inp').value=qty;
   document.getElementById('qty-ov').classList.add('open');
-  setTimeout(function(){
-    var inp=document.getElementById('qty-inp');
-    inp.focus();
-    inp.select();
-  },300);
+  focusQtyInput();
 }
 async function saveQty(){
   if(pendingStapleId){
     await confirmStapleQty();
     return;
   }
-  var q=Math.round((parseFloat(document.getElementById('qty-inp').value)||1)*10)/10;
+  var q=normalizeQtyValue(document.getElementById('qty-inp').value, null);
+  if(q===null){ focusQtyInput(); return; }
   if(qtyItemId){
     var it=null; for(var i=0;i<items.length;i++){if(items[i].id===qtyItemId){it=items[i];break;}}
-    if(it){it.quantity=Math.max(0,q);drawAll();await SB.from('truck_items').update({quantity:Math.max(0,q)}).eq('id',qtyItemId);}
+    if(it){
+      it.quantity=q;
+      drawAll();
+      var up=await SB.from('truck_items').update({quantity:q}).eq('id',qtyItemId);
+      if(up.error) alert('保存エラー: '+up.error.message);
+    }
   }
   document.getElementById('qty-ov').classList.remove('open');qtyItemId=null;
 }
 document.getElementById('qty-ov').addEventListener('click',function(e){if(e.target===document.getElementById('qty-ov')){document.getElementById('qty-ov').classList.remove('open');pendingStapleId=null;qtyItemId=null;}});
 document.getElementById('qty-inp').addEventListener('keydown',function(e){if(e.key==='Enter')saveQty();});
+document.getElementById('qty-inp').addEventListener('click',function(){this.focus();this.select();});
+document.getElementById('qty-inp').addEventListener('touchstart',function(){this.focus();this.select();},{passive:true});
 
 function toggleMic(){
   if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){alert('音声入力非対応');return;}
