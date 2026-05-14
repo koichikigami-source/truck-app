@@ -124,6 +124,14 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 .switch-text{display:flex;flex-direction:column;gap:2px;}
 .switch-title{font-weight:600;color:var(--tx);}
 .switch-sub{font-size:11px;color:var(--tx2);}
+
+.mini-switch-row{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.mini-switch{width:46px;height:26px;border-radius:999px;background:var(--g2);position:relative;display:inline-block;transition:background .18s;cursor:pointer;}
+.mini-switch input{position:absolute;opacity:0;pointer-events:none;}
+.mini-switch .mini-knob{width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;left:2px;top:2px;box-shadow:0 1px 4px rgba(0,0,0,.22);transition:transform .18s;}
+.mini-switch input:checked + .mini-knob{transform:translateX(20px);}
+.mini-switch:has(input:checked){background:var(--gn);}
+.mini-noqty-label{font-size:11px;color:var(--gn);font-weight:600;white-space:nowrap;}
 #qty-ov{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:250;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s;}
 #qty-ov.open{opacity:1;pointer-events:all;}
 #qty-box{background:var(--w);border-radius:var(--r);padding:24px 20px;width:200px;text-align:center;}
@@ -999,7 +1007,11 @@ function drawSettings(){
       h+='<div class="set-row" id="dr-staple-'+s.id+'" draggable="true"';
       h+=' ondragstart="onDragStart(event,\''+s.id+'\',\'staple\')" ondragover="onDragOver(event,\''+s.id+'\',\'staple\')" ondragleave="onDragLeave(\''+s.id+'\',\'staple\')" ondrop="onDrop(event,\''+s.id+'\',\'staple\')" ondragend="onDragEnd()">';
       h+='<div class="drag-handle" ontouchstart="onTouchDragStart(event,\''+s.id+'\',\'staple\')" ontouchmove="onTouchDragMove(event,\''+s.id+'\',\'staple\')" ontouchend="onTouchDragEnd(event,\''+s.id+'\',\'staple\')">⠿</div>';
-      h+='<div class="set-name">'+s.name+'</div>';
+      h+='<div class="set-name">'+s.name+(s.no_qty?' <span class="mini-noqty-label">数量なし</span>':'')+'</div>';
+      h+='<label class="mini-switch" title="数量入力なし" onclick="event.stopPropagation()">';
+      h+='<input type="checkbox" '+(s.no_qty?'checked':'')+' onchange="toggleStapleNoQty(event,\''+s.id+'\')">';
+      h+='<span class="mini-knob"></span>';
+      h+='</label>';
       h+='<button class="ebtn" onclick="openEditStaple(\''+s.id+'\')">✏️</button>';
       h+='<button class="dbtn" onclick="deleteStaple(\''+s.id+'\')">✕</button>';
       h+='</div>';
@@ -1007,6 +1019,20 @@ function drawSettings(){
   }
   h+='<div class="set-add" onclick="openAddStaple()">＋ 定番アイテムを追加</div>';
   se.innerHTML=h;
+}
+
+async function toggleStapleNoQty(e,id){
+  if(e&&e.stopPropagation)e.stopPropagation();
+  var checked=e.target.checked ? true : false;
+  for(var i=0;i<staples.length;i++){
+    if(staples[i].id===id){
+      staples[i].no_qty=checked;
+      break;
+    }
+  }
+  drawSettings();
+  await SB.from('truck_staples').update({no_qty:checked}).eq('id',id);
+  drawAll();
 }
 
 document.getElementById('settings-btn').addEventListener('click',function(){
