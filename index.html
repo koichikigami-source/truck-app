@@ -42,6 +42,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 #staple-chips{display:flex;gap:6px;flex-wrap:wrap;}
 .s-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--g2);font-size:13px;cursor:pointer;background:var(--w);transition:all .2s;}
 .s-chip.added{background:var(--gn2);border-color:var(--gn);color:var(--gn);transform:scale(1.05);}
+.s-chip.in-list{background:var(--gn2);border-color:var(--gn);color:var(--gn);font-weight:700;}
+.s-chip.in-list::after{content:" ✓";font-weight:700;}
 #clear-btn-wrap{display:flex;justify-content:flex-end;margin-bottom:8px;}
 #clear-btn{padding:7px 14px;border-radius:20px;border:1px solid var(--rd);background:transparent;color:var(--rd);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;}
 /* items */
@@ -311,7 +313,7 @@ function drawMain(){
         h+='<span style="width:8px;height:8px;border-radius:50%;background:'+g.color+';display:inline-block;"></span>';
         h+='<span>'+escHtml(g.name)+'</span></div>';
         h+='<div id="staple-chips" style="margin-bottom:8px;">';
-        for(var i=0;i<gs.length;i++) h+='<div class="s-chip" id="chip-'+gs[i].id+'" onclick="addFromStaple(\''+gs[i].id+'\')">'+escHtml(gs[i].name)+'</div>';
+        for(var i=0;i<gs.length;i++) h+='<div class="s-chip'+(stapleInCurrentList(gs[i])?' in-list':'')+'" id="chip-'+gs[i].id+'" onclick="addFromStaple(\''+gs[i].id+'\')">'+escHtml(gs[i].name)+'</div>';
         h+='</div>';
       }
       var noSubStaples=cs.filter(function(st){return !st.subcategory_id;});
@@ -319,13 +321,13 @@ function drawMain(){
         noSubStaples.sort(function(a,b){return (a.sort_order||9999)-(b.sort_order||9999);});
         h+='<div style="margin:8px 0 4px;font-size:12px;color:var(--tx2);">未分類</div>';
         h+='<div id="staple-chips">';
-        for(var i=0;i<noSubStaples.length;i++) h+='<div class="s-chip" id="chip-'+noSubStaples[i].id+'" onclick="addFromStaple(\''+noSubStaples[i].id+'\')">'+escHtml(noSubStaples[i].name)+'</div>';
+        for(var i=0;i<noSubStaples.length;i++) h+='<div class="s-chip'+(stapleInCurrentList(noSubStaples[i])?' in-list':'')+'" id="chip-'+noSubStaples[i].id+'" onclick="addFromStaple(\''+noSubStaples[i].id+'\')">'+escHtml(noSubStaples[i].name)+'</div>';
         h+='</div>';
       }
     }else{
       h+='<div id="staple-chips">';
       cs.sort(function(a,b){return (a.sort_order||9999)-(b.sort_order||9999);});
-      for(var i=0;i<cs.length;i++) h+='<div class="s-chip" id="chip-'+cs[i].id+'" onclick="addFromStaple(\''+cs[i].id+'\')">'+escHtml(cs[i].name)+'</div>';
+      for(var i=0;i<cs.length;i++) h+='<div class="s-chip'+(stapleInCurrentList(cs[i])?' in-list':'')+'" id="chip-'+cs[i].id+'" onclick="addFromStaple(\''+cs[i].id+'\')">'+escHtml(cs[i].name)+'</div>';
       h+='</div>';
     }
     h+='</div>';
@@ -417,6 +419,13 @@ function displayQty(q){
   if(isNaN(n)) return q;
   n=Math.round(n*10)/10;
   return (Math.abs(n-Math.round(n))<0.0001)?String(Math.round(n)):String(n);
+}
+function stapleInCurrentList(st){
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    if(it.category_id===(st.category_id||activeCat)&&it.name===st.name&&!it.checked) return true;
+  }
+  return false;
 }
 function itemHTML(it,isPrep){
   var dc=it.checked?' done':'';
