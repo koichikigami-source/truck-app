@@ -114,6 +114,16 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
 .m-acts{display:flex;gap:8px;margin-top:16px;}
 .mbtn{flex:1;padding:12px;border-radius:var(--rs);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--g2);background:var(--g1);color:var(--tx);}
 .mbtn-p{background:var(--gn);color:#fff;border-color:var(--gn);}
+
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--g1);border:1px solid var(--g2);border-radius:var(--rs);padding:12px 14px;font-size:14px;cursor:pointer;user-select:none;}
+.switch-row input{position:absolute;opacity:0;pointer-events:none;}
+.switch{width:52px;height:30px;border-radius:999px;background:var(--g2);position:relative;flex-shrink:0;transition:background .18s;}
+.switch-knob{width:26px;height:26px;border-radius:50%;background:#fff;position:absolute;left:2px;top:2px;box-shadow:0 1px 4px rgba(0,0,0,.22);transition:transform .18s;}
+.switch-row input:checked + .switch{background:var(--gn);}
+.switch-row input:checked + .switch .switch-knob{transform:translateX(22px);}
+.switch-text{display:flex;flex-direction:column;gap:2px;}
+.switch-title{font-weight:600;color:var(--tx);}
+.switch-sub{font-size:11px;color:var(--tx2);}
 #qty-ov{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:250;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s;}
 #qty-ov.open{opacity:1;pointer-events:all;}
 #qty-box{background:var(--w);border-radius:var(--r);padding:24px 20px;width:200px;text-align:center;}
@@ -170,7 +180,16 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--tx);
     <div class="m-field"><div class="m-label">アイテム名</div><input class="m-inp" id="staple-name-inp" placeholder="例：醤油"></div>
     <div class="m-field"><div class="m-label">カテゴリ</div><select class="m-inp" id="staple-cat-inp" onchange="updateStapleSubcatSelect()"></select></div>
     <div class="m-field"><div class="m-label">サブカテゴリ</div><select class="m-inp" id="staple-subcat-inp"><option value="">なし</option></select></div>
-    <div class="m-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="checkbox" id="staple-noqty-inp" style="width:18px;height:18px;"> 数量入力なし（釣銭など）</label></div>
+    <div class="m-field">
+      <label class="switch-row" for="staple-noqty-inp">
+        <span class="switch-text">
+          <span class="switch-title">数量入力なし</span>
+          <span class="switch-sub">ONにすると定番リストからタップしただけで追加します</span>
+        </span>
+        <input type="checkbox" id="staple-noqty-inp">
+        <span class="switch"><span class="switch-knob"></span></span>
+      </label>
+    </div>
     <div class="m-acts">
       <button class="mbtn" onclick="closeOv('staple-ov')">キャンセル</button>
       <button class="mbtn mbtn-p" onclick="saveStaple()">保存</button>
